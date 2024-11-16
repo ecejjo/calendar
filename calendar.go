@@ -50,7 +50,7 @@ func main() {
 	} else if showThreeMonths {
 		calendarToShow[time.Now().Month()] = currentYearCalendar[time.Now().Month()]
 		calendarToShow[time.Now().Month()+1] = currentYearCalendar[time.Now().Month()+1]
-		calendarToShow[time.Now().Month()+2] = currentYearCalendar[time.Now().Month()+2]
+		// calendarToShow[time.Now().Month()+2] = currentYearCalendar[time.Now().Month()+2]
 	} else if months != 0 {
 		for i := 0; i < months; i++ {
 			// TODO: this is pending to fix
@@ -74,9 +74,9 @@ func (week WeekAsAMapOfWeekDaysType) String() string {
 	returnString := ""
 	for dayIndex := time.Sunday; dayIndex <= time.Saturday; dayIndex++ {
 		if week[dayIndex] == 0 {
-			returnString = returnString + "   "
+			returnString += "   "
 		} else {
-			returnString = returnString + fmt.Sprintf("%2d ", week[dayIndex])
+			returnString += fmt.Sprintf("%2d ", week[dayIndex])
 		}
 	}
 	return returnString
@@ -88,7 +88,7 @@ type MonthAsAMapOfWeeks map[int]WeekAsAMapOfWeekDaysType
 func (month MonthAsAMapOfWeeks) String() string {
 	returnString := ""
 	for weekIndex := 0; weekIndex < len(month); weekIndex++ {
-		returnString = returnString + month[weekIndex].String() + "\n"
+		returnString += month[weekIndex].String() + "\n"
 	}
 	return returnString
 }
@@ -100,9 +100,9 @@ func (year YearAsAnSlideOfMonthsType) String() string {
 	returnString := ""
 	for monthIndex := 0; monthIndex < len(year); monthIndex++ {
 		if year[monthIndex] == nil {continue}
-		returnString = returnString + "   " + time.Month(monthIndex).String() + " " + strconv.Itoa(currentYearNumber) + "\n"
-		returnString = returnString + " " + WeekHeader + "\n"
-		returnString = returnString + fmt.Sprint(returnString, year[monthIndex].String() + "\n")
+		returnString += "    " + time.Month(monthIndex).String() + " " + strconv.Itoa(currentYearNumber) + "\n"
+		returnString += " " + WeekHeader + "\n"
+		returnString += year[monthIndex].String()
 	}
 	return returnString
 }
