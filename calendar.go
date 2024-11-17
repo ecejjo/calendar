@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,7 +15,7 @@ import (
 // setup would normally be an init() function, however, there seems
 // to be something awry with the testing framework when we set the
 // global Logger from an init()
-func setup() {
+func setupLog() {
 
 	zerolog.TimeFieldFormat = ""
 
@@ -26,46 +27,49 @@ func setup() {
 
 func main() {
 
-	setup()
-	log.Info().Msg("hello world")
+	setupLog()
+	log.Info().Msg("Calendar starting ...")
 
-	showOneMonth, showThreeMonths, months, weekNumbering, year := false, false, 0, false, false
+	log.Debug().Msg(fmt.Sprintf("Go-syntax: %#v", calendar))
+
+	numberOfMonths, weekNumbering :=  0, false
 
 	// Access specific arguments
+	log.Info().Msg("Reading command line arguments...")
 	if len(os.Args) > 1 {
 		for i, arg := range os.Args[1:] {
 			fmt.Printf("Arg %d: %s\n", i+1, arg)
-			if os.Args[i+1] == "-1" { showOneMonth = true }
-			if os.Args[i+1] == "-3" { showThreeMonths = true }
-			if os.Args[i+1] == "--months" { months, _ = strconv.Atoi(os.Args[i+2]) }
+			if os.Args[i+1] == "-1" { numberOfMonths = 1 }
+			if os.Args[i+1] == "-3" { numberOfMonths = 3 }
+			if os.Args[i+1] == "--months" { numberOfMonths, _ = strconv.Atoi(os.Args[i+2]) }
 			if os.Args[i+1] == "--week-numbering" { weekNumbering = true }
-			if os.Args[i+1] == "--year" { year = true }
+			if os.Args[i+1] == "--year" { numberOfMonths = 12 }
 		}
 	} else {
 		log.Info().Msg("No arguments provided.")
 	}
 
-	calendarToShow := make(YearAsAnSlideOfMonthsType, MonthsPerYear)
+	// Initialize calendar to show
+	log.Debug().Msg("Initializing calendarToShow ...")
+	var calendarToShow = make(calendarType)
+	calendarToShow[time.Now().Year()] = make(YearAsAMapOfMonthsType, MonthsPerYear)
+	calendarToShow[time.Now().Year() + 1] = make(YearAsAMapOfMonthsType, MonthsPerYear)
 
-	if showOneMonth {
-		calendarToShow[time.Now().Month()] = currentYearCalendar[time.Now().Month()]
-	} else if showThreeMonths {
-		calendarToShow[time.Now().Month()-2] = currentYearCalendar[time.Now().Month()-2]
-		calendarToShow[time.Now().Month()-1] = currentYearCalendar[time.Now().Month()-1]
-		calendarToShow[time.Now().Month()] = currentYearCalendar[time.Now().Month()]
-		calendarToShow[time.Now().Month()+1] = currentYearCalendar[time.Now().Month()+1]
-	} else if months != 0 {
-		for i := 0; i < months; i++ {
-			monthIndex := int(time.Now().Month()) + i
-			calendarToShow[monthIndex] = currentYearCalendar[monthIndex]
+	log.Debug().Msg(fmt.Sprintf("Go-syntax: %#v", calendarToShow))
+
+	if numberOfMonths != 0 {
+		for i := 0; i < numberOfMonths; i++ {
+			currentTime := time.Now()
+			nextMonthTime := currentTime.AddDate(0, i, 0)
+			calendarToShow[nextMonthTime.Year()][nextMonthTime.Month()] = calendar[nextMonthTime.Year()][nextMonthTime.Month()]
 		}
 	} else if weekNumbering {
+		// TODO
 		fmt.Println(WeekHeader)
-		fmt.Println(currentYearCalendar[time.Now().Month()].String())
-	} else if year {
-		calendarToShow = currentYearCalendar
-	}
-	fmt.Println(calendarToShow.StringInterlaced())
+	}	
+	
+	log.Debug().Msg(fmt.Sprintf("Go-syntax: %#v", calendarToShow))
+	fmt.Println(calendarToShow.String())
 }
 
 const WeekHeader = "Su Mo Tu We Th Fr Sa"
@@ -100,103 +104,112 @@ func (month MonthAsAMapOfWeeks) String() string {
 }
 
 // Array of months in a year
-type YearAsAnSlideOfMonthsType []MonthAsAMapOfWeeks
+type YearAsAMapOfMonthsType map[time.Month]MonthAsAMapOfWeeks
 
-func (year YearAsAnSlideOfMonthsType) String() string {
+func (year YearAsAMapOfMonthsType) String() string {
 	returnString := ""
-	for monthIndex := 0; monthIndex < len(year); monthIndex++ {
+	for monthIndex := time.January; monthIndex <= time.December; monthIndex++ {
 		if year[monthIndex] == nil {continue}
-		returnString += "    " + time.Month(monthIndex).String() + " " + strconv.Itoa(currentYearNumber) + "\n"
+		returnString += "    " + time.Month(monthIndex).String() + "\n"
 		returnString += " " + WeekHeader + "\n"
 		returnString += year[monthIndex].String()
 	}
 	return returnString
 }
 
-func (year YearAsAnSlideOfMonthsType) StringInterlaced() string {
+type calendarType map[int]YearAsAMapOfMonthsType
+
+func (calendar calendarType) String() string {
 	returnString := ""
 
-	// Prints month + year header
-	for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
-		for monthIndex := 0; monthIndex < len(year); monthIndex++ {
-			if year[monthIndex] == nil {continue}
-			if year[monthIndex][weekIndex] == nil {continue}
-			if weekIndex == 0 {
-				auxString := ""
-				auxString += time.Month(monthIndex).String()
-				auxString += " "
-				auxString += strconv.Itoa(currentYearNumber)
-				returnString += centerString(auxString, len(WeekHeader))
-				returnString += "   "
-			}
-		}
-	}
-	returnString += "\n"
+	// For year in calendar
+	for yearNumber, yearMapOfMonths := range calendar {
 
-	// Prints week headers
-	for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
-		for monthIndex := 0; monthIndex < len(year); monthIndex++ {
-			if year[monthIndex] == nil {continue}
-			if year[monthIndex][weekIndex] == nil {continue}
-			if weekIndex == 0 {
-				returnString += " "
-				returnString += WeekHeader
-				returnString += "  "
+		// Prints month + year header
+		for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+			for monthIndex := time.January; monthIndex <= time.December; monthIndex++ {
+				if yearMapOfMonths[monthIndex] == nil {continue}
+				if yearMapOfMonths[monthIndex][weekIndex] == nil {continue}
+				if weekIndex == 0 {
+					auxString := ""
+					auxString += time.Month(monthIndex).String()
+					auxString += " "
+					auxString += strconv.Itoa(yearNumber)
+					returnString += centerString(auxString, len(WeekHeader))
+					returnString += "   "
+				}
 			}
-		}
-	}
-	returnString += "\n"
-
-	// Prints months weeks
-	for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
-		for monthIndex := 0; monthIndex < len(year); monthIndex++ {
-			if year[monthIndex] == nil {continue}
-			if year[monthIndex][weekIndex] == nil {continue}
-			returnString += " "
-			returnString += year[monthIndex][weekIndex].String()
-			returnString += " "
 		}
 		returnString += "\n"
+
+		// Prints week headers
+		for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+			for monthIndex := time.January; monthIndex <= time.December; monthIndex++ {
+				if yearMapOfMonths[monthIndex] == nil {continue}
+				if yearMapOfMonths[monthIndex][weekIndex] == nil {continue}
+				if weekIndex == 0 {
+					returnString += " "
+					returnString += WeekHeader
+					returnString += "  "
+				}
+			}
+		}
+		returnString += "\n"
+
+		// Prints months weeks
+		for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+			for monthIndex := time.January; monthIndex <= time.December; monthIndex++ {
+				if yearMapOfMonths[monthIndex] == nil {continue}
+				if yearMapOfMonths[monthIndex][weekIndex] == nil {continue}
+				returnString += " "
+				returnString += yearMapOfMonths[monthIndex][weekIndex].String()
+				returnString += " "
+			}
+			returnString += "\n"
+		}
 	}
 	return returnString
 }
 
-
-var currentYearNumber int
-var currentYearCalendar YearAsAnSlideOfMonthsType
+var calendar calendarType
 
 // Initialize calendar of current year
 func init()	{
-	fmt.Println("Initializing calendar...")
+	log.Debug().Msg("Initializing calendar ...")
 
-	currentYearNumber = time.Now().Year()
-	currentYearCalendar = make(YearAsAnSlideOfMonthsType, MonthsPerYear)
+	calendar = make(map[int]YearAsAMapOfMonthsType)
 
-	// For each month in a year
-	for month := time.January; month <= time.December; month++ {
-		fmt.Println("Initializing month: ", month, "...")
-		currentYearCalendar[month] = MonthAsAMapOfWeeks{}
+	// For two years in calendar
+	for yearNumber := time.Now().Year(); yearNumber <= time.Now().Year() + 1; yearNumber++ {
+		log.Debug().Msg("Initializing year: " + strconv.Itoa(yearNumber) + " ...")
+		calendar[yearNumber] = YearAsAMapOfMonthsType{}
 
-		// Gets the week day of the first day of the month
-		firstWeekDayInMonth := time.Date(currentYearNumber, month, 1, 0, 0, 0, 0, time.UTC).Weekday()
-		log.Debug().Msg("First week day is: " + firstWeekDayInMonth.String())
+		// For each month in a year
+		for monthIndex := time.January; monthIndex <= time.December; monthIndex++ {
+			log.Debug().Msg("Initializing month: " + time.Month(monthIndex).String() + "...")
+			calendar[yearNumber][monthIndex] = MonthAsAMapOfWeeks{}
 
-		numberOfDaysInMonth := GetDaysInMonth(currentYearNumber, month)
-		log.Debug().Msg("Number of days in month is: " + strconv.Itoa(numberOfDaysInMonth))
+			// Gets the week day of the first day of the month
+			firstWeekDayInMonth := time.Date(yearNumber, time.Month(monthIndex), 1, 0, 0, 0, 0, time.UTC).Weekday()
+			log.Debug().Msg("First week day is: " + firstWeekDayInMonth.String())
 
-		// Fills the days of the month
-		weekIndex := 0
-		currentYearCalendar[month][weekIndex] = WeekAsAMapOfWeekDaysType{}
-		weekDayIndex := firstWeekDayInMonth
-		for dayNumber := 1; dayNumber <= numberOfDaysInMonth; dayNumber++ {
-			log.Debug().Msg("Initializing month number and day number: " + month.String() + strconv.Itoa(dayNumber) + "...")
-			currentYearCalendar[month][weekIndex][weekDayIndex] = dayNumber
-			if weekDayIndex == 6 {
-				weekDayIndex = 0
-				weekIndex++
-				currentYearCalendar[month][weekIndex] = WeekAsAMapOfWeekDaysType{}
-			} else {
-				weekDayIndex++
+			numberOfDaysInMonth := GetDaysInMonth(yearNumber, time.Month(monthIndex))
+			log.Debug().Msg("Number of days in month is: " + strconv.Itoa(numberOfDaysInMonth))
+
+			// Fills the days of the month
+			weekIndex := 0
+			calendar[yearNumber][monthIndex][weekIndex] = WeekAsAMapOfWeekDaysType{}
+			weekDayIndex := firstWeekDayInMonth
+			for dayNumber := 1; dayNumber <= numberOfDaysInMonth; dayNumber++ {
+				log.Debug().Msg("Initializing month number and day number: " + time.Month(monthIndex).String() + strconv.Itoa(dayNumber) + "...")
+				calendar[yearNumber][monthIndex][weekIndex][weekDayIndex] = dayNumber
+				if weekDayIndex == 6 {
+					weekDayIndex = 0
+					weekIndex++
+					calendar[yearNumber][monthIndex][weekIndex] = WeekAsAMapOfWeekDaysType{}
+				} else {
+					weekDayIndex++
+				}
 			}
 		}
 	}
