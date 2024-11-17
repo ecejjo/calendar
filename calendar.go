@@ -32,7 +32,7 @@ func main() {
 
 	log.Debug().Msg(fmt.Sprintf("Go-syntax: %#v", calendar))
 
-	numberOfMonths, weekNumbering :=  0, false
+	numberOfMonths, year, weekNumbering :=  0, false, false
 
 	// Access specific arguments
 	log.Info().Msg("Reading command line arguments...")
@@ -43,7 +43,7 @@ func main() {
 			if os.Args[i+1] == "-3" { numberOfMonths = 3 }
 			if os.Args[i+1] == "--months" { numberOfMonths, _ = strconv.Atoi(os.Args[i+2]) }
 			if os.Args[i+1] == "--week-numbering" { weekNumbering = true }
-			if os.Args[i+1] == "--year" { numberOfMonths = 12 }
+			if os.Args[i+1] == "--year" { year = true }
 		}
 	} else {
 		log.Info().Msg("No arguments provided.")
@@ -63,6 +63,11 @@ func main() {
 			nextMonthTime := currentTime.AddDate(0, i, 0)
 			calendarToShow[nextMonthTime.Year()][nextMonthTime.Month()] = calendar[nextMonthTime.Year()][nextMonthTime.Month()]
 		}
+	} else if year {
+		currentYear := time.Now().Year()
+		for month := time.January; month <= time.December; month++ {
+			calendarToShow[currentYear][month] = calendar[currentYear][month]
+		}		
 	} else if weekNumbering {
 		// TODO
 		fmt.Println(WeekHeader)
@@ -120,18 +125,28 @@ func (year YearAsAMapOfMonthsType) String() string {
 type calendarType map[int]YearAsAMapOfMonthsType
 
 func (calendar calendarType) String() string {
+
+	// When iterating over a map using a for range loop in Go, the order of iteration is random and not guaranteed.
+	// The Go runtime intentionally randomizes the iteration order over maps for security and performance reasons, so you should not rely on any specific order.
+
+	// Extract and sort calendar keys to iterate in order
+	calendarKeys := make([]int, 0, len(calendar))
+	for key := range calendar {
+		calendarKeys = append(calendarKeys, key)
+	}
+	sort.Ints(calendarKeys)
+
 	returnString := ""
 
-	// For year in calendar
-	for yearNumber, yearMapOfMonths := range calendar {
-
-		// Prints month + year header
-		for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+	// Prints month + year header
+	for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+		for _, yearNumber := range calendarKeys {
+			yearMapOfMonths := calendar[yearNumber]
 			for monthIndex := time.January; monthIndex <= time.December; monthIndex++ {
 				if yearMapOfMonths[monthIndex] == nil {continue}
 				if yearMapOfMonths[monthIndex][weekIndex] == nil {continue}
 				if weekIndex == 0 {
-					auxString := ""
+					auxString := " "
 					auxString += time.Month(monthIndex).String()
 					auxString += " "
 					auxString += strconv.Itoa(yearNumber)
@@ -140,10 +155,13 @@ func (calendar calendarType) String() string {
 				}
 			}
 		}
-		returnString += "\n"
+	}
+	returnString += "\n"
 
-		// Prints week headers
-		for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+	// Prints week headers
+	for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+		for _, yearNumber := range calendarKeys {
+			yearMapOfMonths := calendar[yearNumber]
 			for monthIndex := time.January; monthIndex <= time.December; monthIndex++ {
 				if yearMapOfMonths[monthIndex] == nil {continue}
 				if yearMapOfMonths[monthIndex][weekIndex] == nil {continue}
@@ -154,10 +172,13 @@ func (calendar calendarType) String() string {
 				}
 			}
 		}
-		returnString += "\n"
-
-		// Prints months weeks
-		for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+	}
+	returnString += "\n"
+	
+	// Print weeks
+	for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+		for _, yearNumber := range calendarKeys {
+			yearMapOfMonths := calendar[yearNumber]
 			for monthIndex := time.January; monthIndex <= time.December; monthIndex++ {
 				if yearMapOfMonths[monthIndex] == nil {continue}
 				if yearMapOfMonths[monthIndex][weekIndex] == nil {continue}
@@ -165,8 +186,8 @@ func (calendar calendarType) String() string {
 				returnString += yearMapOfMonths[monthIndex][weekIndex].String()
 				returnString += " "
 			}
-			returnString += "\n"
 		}
+		returnString += "\n"
 	}
 	return returnString
 }
@@ -201,14 +222,17 @@ func init()	{
 			calendar[yearNumber][monthIndex][weekIndex] = WeekAsAMapOfWeekDaysType{}
 			weekDayIndex := firstWeekDayInMonth
 			for dayNumber := 1; dayNumber <= numberOfDaysInMonth; dayNumber++ {
-				log.Debug().Msg("Initializing month number and day number: " + time.Month(monthIndex).String() + strconv.Itoa(dayNumber) + "...")
+				log.Debug().Msg("Initializing day ... month number and day number: " + time.Month(monthIndex).String() + " " + strconv.Itoa(dayNumber) + " ...")
+				log.Debug().Msg("- Month: " + time.Month(monthIndex).String())
+				log.Debug().Msg("- Day number: "  + strconv.Itoa(dayNumber))
+				log.Debug().Msg("- Week day  : " + weekDayIndex.String())
 				calendar[yearNumber][monthIndex][weekIndex][weekDayIndex] = dayNumber
-				if weekDayIndex == 6 {
-					weekDayIndex = 0
+				if (weekDayIndex != time.Saturday) {
+					weekDayIndex++
+				} else {
+					weekDayIndex = time.Sunday
 					weekIndex++
 					calendar[yearNumber][monthIndex][weekIndex] = WeekAsAMapOfWeekDaysType{}
-				} else {
-					weekDayIndex++
 				}
 			}
 		}
