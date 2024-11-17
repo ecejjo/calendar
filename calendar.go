@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -28,7 +29,7 @@ func main() {
 	setup()
 	log.Info().Msg("hello world")
 
-	showOneMonth, showThreeMonths, months, weekNumbering := false, false, 0, false
+	showOneMonth, showThreeMonths, months, weekNumbering, year := false, false, 0, false, false
 
 	// Access specific arguments
 	if len(os.Args) > 1 {
@@ -38,6 +39,7 @@ func main() {
 			if os.Args[i+1] == "-3" { showThreeMonths = true }
 			if os.Args[i+1] == "--months" { months, _ = strconv.Atoi(os.Args[i+2]) }
 			if os.Args[i+1] == "--week-numbering" { weekNumbering = true }
+			if os.Args[i+1] == "--year" { year = true }
 		}
 	} else {
 		log.Info().Msg("No arguments provided.")
@@ -48,24 +50,28 @@ func main() {
 	if showOneMonth {
 		calendarToShow[time.Now().Month()] = currentYearCalendar[time.Now().Month()]
 	} else if showThreeMonths {
+		calendarToShow[time.Now().Month()-2] = currentYearCalendar[time.Now().Month()-2]
+		calendarToShow[time.Now().Month()-1] = currentYearCalendar[time.Now().Month()-1]
 		calendarToShow[time.Now().Month()] = currentYearCalendar[time.Now().Month()]
 		calendarToShow[time.Now().Month()+1] = currentYearCalendar[time.Now().Month()+1]
-		// calendarToShow[time.Now().Month()+2] = currentYearCalendar[time.Now().Month()+2]
 	} else if months != 0 {
 		for i := 0; i < months; i++ {
-			// TODO: this is pending to fix
-			calendarToShow[time.Now().Month()] = currentYearCalendar[time.Now().Month()]
+			monthIndex := int(time.Now().Month()) + i
+			calendarToShow[monthIndex] = currentYearCalendar[monthIndex]
 		}
 	} else if weekNumbering {
 		fmt.Println(WeekHeader)
 		fmt.Println(currentYearCalendar[time.Now().Month()].String())
+	} else if year {
+		calendarToShow = currentYearCalendar
 	}
-	fmt.Println(calendarToShow.String())
+	fmt.Println(calendarToShow.StringInterlaced())
 }
 
 const WeekHeader = "Su Mo Tu We Th Fr Sa"
 const NumberOfDaysPerWeek = 7
 const MonthsPerYear = 13
+const MaxNumberOfWeeksPerMonth = 6
 
 // Array of days per week
 type WeekAsAMapOfWeekDaysType map[time.Weekday]int
@@ -106,6 +112,55 @@ func (year YearAsAnSlideOfMonthsType) String() string {
 	}
 	return returnString
 }
+
+func (year YearAsAnSlideOfMonthsType) StringInterlaced() string {
+	returnString := ""
+
+	// Prints month + year header
+	for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+		for monthIndex := 0; monthIndex < len(year); monthIndex++ {
+			if year[monthIndex] == nil {continue}
+			if year[monthIndex][weekIndex] == nil {continue}
+			if weekIndex == 0 {
+				auxString := ""
+				auxString += time.Month(monthIndex).String()
+				auxString += " "
+				auxString += strconv.Itoa(currentYearNumber)
+				returnString += centerString(auxString, len(WeekHeader))
+				returnString += "   "
+			}
+		}
+	}
+	returnString += "\n"
+
+	// Prints week headers
+	for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+		for monthIndex := 0; monthIndex < len(year); monthIndex++ {
+			if year[monthIndex] == nil {continue}
+			if year[monthIndex][weekIndex] == nil {continue}
+			if weekIndex == 0 {
+				returnString += " "
+				returnString += WeekHeader
+				returnString += "  "
+			}
+		}
+	}
+	returnString += "\n"
+
+	// Prints months weeks
+	for weekIndex := 0; weekIndex < MaxNumberOfWeeksPerMonth; weekIndex++ {
+		for monthIndex := 0; monthIndex < len(year); monthIndex++ {
+			if year[monthIndex] == nil {continue}
+			if year[monthIndex][weekIndex] == nil {continue}
+			returnString += " "
+			returnString += year[monthIndex][weekIndex].String()
+			returnString += " "
+		}
+		returnString += "\n"
+	}
+	return returnString
+}
+
 
 var currentYearNumber int
 var currentYearCalendar YearAsAnSlideOfMonthsType
@@ -157,4 +212,19 @@ func GetDaysInMonth(year int, month time.Month) int {
 	lastDayOfMonth := firstDayOfMonth.AddDate(0, 1, -1)
 
 	return lastDayOfMonth.Day()
+}
+
+func centerString(s string, width int) string {
+	if len(s) >= width {
+		// If the string is already as wide or wider than the specified width, return it as is
+		return s
+	}
+
+	// Calculate padding
+	totalPadding := width - len(s)
+	leftPadding := totalPadding / 2
+	rightPadding := totalPadding - leftPadding
+
+	// Create the centered string
+	return fmt.Sprintf("%s%s%s", strings.Repeat(" ", leftPadding), s, strings.Repeat(" ", rightPadding))
 }
