@@ -12,25 +12,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// setup would normally be an init() function, however, there seems
-// to be something awry with the testing framework when we set the
-// global Logger from an init()
-func setupLog() {
-
-	zerolog.TimeFieldFormat = ""
-
-	zerolog.TimestampFunc = func() time.Time {
-		return time.Date(2008, 1, 8, 17, 5, 05, 0, time.UTC)
-	}
-	log.Logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
-}
 
 func main() {
 
 	setupLog()
 	log.Info().Msg("Calendar starting ...")
-
-	log.Debug().Msg(fmt.Sprintf("Go-syntax: %#v", calendar))
 
 	numberOfMonths, year, weekNumbering :=  0, false, false
 
@@ -55,13 +41,16 @@ func main() {
 	calendarToShow[time.Now().Year()] = make(YearAsAMapOfMonthsType, MonthsPerYear)
 	calendarToShow[time.Now().Year() + 1] = make(YearAsAMapOfMonthsType, MonthsPerYear)
 
-	log.Debug().Msg(fmt.Sprintf("Go-syntax: %#v", calendarToShow))
-
 	if numberOfMonths != 0 {
 		for i := 0; i < numberOfMonths; i++ {
 			currentTime := time.Now()
 			nextMonthTime := currentTime.AddDate(0, i, 0)
-			calendarToShow[nextMonthTime.Year()][nextMonthTime.Month()] = calendar[nextMonthTime.Year()][nextMonthTime.Month()]
+			// TODO: review if this is the right way to copy maps
+			// calendarToShow[nextMonthTime.Year()][nextMonthTime.Month()] = calendar[nextMonthTime.Year()][nextMonthTime.Month()]
+			calendarToShow[nextMonthTime.Year()][nextMonthTime.Month()] = make(MonthAsAMapOfWeeksType)
+			for key, value := range calendar[nextMonthTime.Year()][nextMonthTime.Month()] {
+				calendarToShow[nextMonthTime.Year()][nextMonthTime.Month()][key] = value
+			}
 		}
 	} else if year {
 		currentYear := time.Now().Year()
@@ -71,15 +60,15 @@ func main() {
 	} else if weekNumbering {
 		// TODO
 		fmt.Println(WeekHeader)
-	}	
-	
-	log.Debug().Msg(fmt.Sprintf("Go-syntax: %#v", calendarToShow))
+	}		
 	fmt.Println(calendarToShow.String())
 }
 
-const WeekHeader = "Su Mo Tu We Th Fr Sa"
+const WeekHeader = "Su Mo Tu We Th Fr Sa "
+const monthsLeftMargin = " "
+const monthsRightMargin = " "
 const NumberOfDaysPerWeek = 7
-const MonthsPerYear = 13
+const MonthsPerYear = 12
 const MaxNumberOfWeeksPerMonth = 6
 
 // Array of days per week
@@ -98,9 +87,9 @@ func (week WeekAsAMapOfWeekDaysType) String() string {
 }
 
 // Map of weeks per month
-type MonthAsAMapOfWeeks map[int]WeekAsAMapOfWeekDaysType
+type MonthAsAMapOfWeeksType map[int]WeekAsAMapOfWeekDaysType
 
-func (month MonthAsAMapOfWeeks) String() string {
+func (month MonthAsAMapOfWeeksType) String() string {
 	returnString := ""
 	for weekIndex := 0; weekIndex < len(month); weekIndex++ {
 		returnString += month[weekIndex].String() + "\n"
@@ -109,7 +98,7 @@ func (month MonthAsAMapOfWeeks) String() string {
 }
 
 // Array of months in a year
-type YearAsAMapOfMonthsType map[time.Month]MonthAsAMapOfWeeks
+type YearAsAMapOfMonthsType map[time.Month]MonthAsAMapOfWeeksType
 
 func (year YearAsAMapOfMonthsType) String() string {
 	returnString := ""
@@ -146,12 +135,10 @@ func (calendar calendarType) String() string {
 				if yearMapOfMonths[monthIndex] == nil {continue}
 				if yearMapOfMonths[monthIndex][weekIndex] == nil {continue}
 				if weekIndex == 0 {
-					auxString := " "
-					auxString += time.Month(monthIndex).String()
+					auxString := time.Month(monthIndex).String()
 					auxString += " "
 					auxString += strconv.Itoa(yearNumber)
-					returnString += centerString(auxString, len(WeekHeader))
-					returnString += "   "
+					returnString += centerString(auxString, len(monthsLeftMargin) + len(WeekHeader) + len(monthsRightMargin))
 				}
 			}
 		}
@@ -166,9 +153,9 @@ func (calendar calendarType) String() string {
 				if yearMapOfMonths[monthIndex] == nil {continue}
 				if yearMapOfMonths[monthIndex][weekIndex] == nil {continue}
 				if weekIndex == 0 {
-					returnString += " "
+					returnString += monthsLeftMargin
 					returnString += WeekHeader
-					returnString += "  "
+					returnString += monthsRightMargin
 				}
 			}
 		}
@@ -181,10 +168,13 @@ func (calendar calendarType) String() string {
 			yearMapOfMonths := calendar[yearNumber]
 			for monthIndex := time.January; monthIndex <= time.December; monthIndex++ {
 				if yearMapOfMonths[monthIndex] == nil {continue}
-				if yearMapOfMonths[monthIndex][weekIndex] == nil {continue}
-				returnString += " "
+				if yearMapOfMonths[monthIndex][weekIndex] == nil {
+					returnString += strings.Repeat(" ", len(monthsLeftMargin) + len(WeekHeader) + len(monthsRightMargin))
+					continue
+				}
+				returnString += monthsLeftMargin
 				returnString += yearMapOfMonths[monthIndex][weekIndex].String()
-				returnString += " "
+				returnString += monthsRightMargin
 			}
 		}
 		returnString += "\n"
@@ -194,10 +184,9 @@ func (calendar calendarType) String() string {
 
 var calendar calendarType
 
-// Initialize calendar of current year
+// Initialize calendar of current year and next years
 func init()	{
 	log.Debug().Msg("Initializing calendar ...")
-
 	calendar = make(map[int]YearAsAMapOfMonthsType)
 
 	// For two years in calendar
@@ -207,36 +196,49 @@ func init()	{
 
 		// For each month in a year
 		for monthIndex := time.January; monthIndex <= time.December; monthIndex++ {
-			log.Debug().Msg("Initializing month: " + time.Month(monthIndex).String() + "...")
-			calendar[yearNumber][monthIndex] = MonthAsAMapOfWeeks{}
 
-			// Gets the week day of the first day of the month
 			firstWeekDayInMonth := time.Date(yearNumber, time.Month(monthIndex), 1, 0, 0, 0, 0, time.UTC).Weekday()
 			log.Debug().Msg("First week day is: " + firstWeekDayInMonth.String())
 
 			numberOfDaysInMonth := GetDaysInMonth(yearNumber, time.Month(monthIndex))
 			log.Debug().Msg("Number of days in month is: " + strconv.Itoa(numberOfDaysInMonth))
 
-			// Fills the days of the month
+			log.Debug().Msg("Initializing month: " + time.Month(monthIndex).String() + "...")
+			calendar[yearNumber][monthIndex] = MonthAsAMapOfWeeksType{}
+
+			// Fills the days of the month, week by week
 			weekIndex := 0
-			calendar[yearNumber][monthIndex][weekIndex] = WeekAsAMapOfWeekDaysType{}
 			weekDayIndex := firstWeekDayInMonth
+			calendar[yearNumber][monthIndex][weekIndex] = WeekAsAMapOfWeekDaysType{}
 			for dayNumber := 1; dayNumber <= numberOfDaysInMonth; dayNumber++ {
-				log.Debug().Msg("Initializing day ... month number and day number: " + time.Month(monthIndex).String() + " " + strconv.Itoa(dayNumber) + " ...")
-				log.Debug().Msg("- Month: " + time.Month(monthIndex).String())
-				log.Debug().Msg("- Day number: "  + strconv.Itoa(dayNumber))
-				log.Debug().Msg("- Week day  : " + weekDayIndex.String())
 				calendar[yearNumber][monthIndex][weekIndex][weekDayIndex] = dayNumber
-				if (weekDayIndex != time.Saturday) {
-					weekDayIndex++
-				} else {
+
+				// Checks if we need to start a new week
+				if (weekDayIndex == time.Saturday) {
 					weekDayIndex = time.Sunday
 					weekIndex++
 					calendar[yearNumber][monthIndex][weekIndex] = WeekAsAMapOfWeekDaysType{}
+
+				} else {
+					weekDayIndex++
 				}
 			}
+			log.Debug().Msg("Month initialized." + calendar[yearNumber][monthIndex].String())
 		}
 	}
+}
+
+// setup would normally be an init() function, however, there seems
+// to be something awry with the testing framework when we set the
+// global Logger from an init()
+func setupLog() {
+
+	zerolog.TimeFieldFormat = ""
+
+	zerolog.TimestampFunc = func() time.Time {
+		return time.Date(2008, 1, 8, 17, 5, 05, 0, time.UTC)
+	}
+	log.Logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
 }
 
 
