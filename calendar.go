@@ -64,20 +64,35 @@ func main() {
 	fmt.Println(calendarToShow.String())
 }
 
-const WeekHeader = "Su Mo Tu We Th Fr Sa "
-const monthsLeftMargin = " "
+const WeekHeader = "Mo Tu We Th Fr Sa Su"
+
+// Weekday is a custom type representing days of the week, starting with Monday
+type weekDay int
+
+// Enumerated constants for days of the week
+const (
+	Monday weekDay = iota // Start at 0 for Monday
+	Tuesday
+	Wednesday
+	Thursday
+	Friday
+	Saturday
+	Sunday
+)
+
 const monthsRightMargin = " "
 const NumberOfDaysPerWeek = 7
 const MonthsPerYear = 12
 const MaxNumberOfWeeksPerMonth = 6
 
 // Array of days per week
-type WeekAsAMapOfWeekDaysType map[time.Weekday]int
+type WeekAsAMapOfWeekDaysType map[weekDay]int
 
 func (week WeekAsAMapOfWeekDaysType) String() string {
 	returnString := ""
-	for dayIndex := time.Sunday; dayIndex <= time.Saturday; dayIndex++ {
+	for dayIndex := Monday; dayIndex <= Sunday; dayIndex++ {
 		if week[dayIndex] == 0 {
+			// No day to print
 			returnString += "   "
 		} else {
 			returnString += fmt.Sprintf("%2d ", week[dayIndex])
@@ -138,7 +153,7 @@ func (calendar calendarType) String() string {
 					auxString := time.Month(monthIndex).String()
 					auxString += " "
 					auxString += strconv.Itoa(yearNumber)
-					returnString += centerString(auxString, len(monthsLeftMargin) + len(WeekHeader) + len(monthsRightMargin))
+					returnString += centerString(auxString, len(WeekHeader) + len(monthsRightMargin) + 1)
 				}
 			}
 		}
@@ -153,9 +168,9 @@ func (calendar calendarType) String() string {
 				if yearMapOfMonths[monthIndex] == nil {continue}
 				if yearMapOfMonths[monthIndex][weekIndex] == nil {continue}
 				if weekIndex == 0 {
-					returnString += monthsLeftMargin
 					returnString += WeekHeader
 					returnString += monthsRightMargin
+					returnString += " "
 				}
 			}
 		}
@@ -169,10 +184,9 @@ func (calendar calendarType) String() string {
 			for monthIndex := time.January; monthIndex <= time.December; monthIndex++ {
 				if yearMapOfMonths[monthIndex] == nil {continue}
 				if yearMapOfMonths[monthIndex][weekIndex] == nil {
-					returnString += strings.Repeat(" ", len(monthsLeftMargin) + len(WeekHeader) + len(monthsRightMargin))
+					returnString += strings.Repeat(" ", len(WeekHeader) + len(monthsRightMargin) + 1)
 					continue
 				}
-				returnString += monthsLeftMargin
 				returnString += yearMapOfMonths[monthIndex][weekIndex].String()
 				returnString += monthsRightMargin
 			}
@@ -208,19 +222,19 @@ func init()	{
 
 			// Fills the days of the month, week by week
 			weekIndex := 0
-			weekDayIndex := firstWeekDayInMonth
+			mondayBasedWeekDayIndex := (weekDay(firstWeekDayInMonth) + 6) % 7
 			calendar[yearNumber][monthIndex][weekIndex] = WeekAsAMapOfWeekDaysType{}
 			for dayNumber := 1; dayNumber <= numberOfDaysInMonth; dayNumber++ {
-				calendar[yearNumber][monthIndex][weekIndex][weekDayIndex] = dayNumber
+				calendar[yearNumber][monthIndex][weekIndex][mondayBasedWeekDayIndex] = dayNumber
 
 				// Checks if we need to start a new week
-				if (weekDayIndex == time.Saturday) {
-					weekDayIndex = time.Sunday
+				if (mondayBasedWeekDayIndex == Sunday) {
+					mondayBasedWeekDayIndex = Monday
 					weekIndex++
 					calendar[yearNumber][monthIndex][weekIndex] = WeekAsAMapOfWeekDaysType{}
 
 				} else {
-					weekDayIndex++
+					mondayBasedWeekDayIndex++
 				}
 			}
 			log.Debug().Msg("Month initialized." + calendar[yearNumber][monthIndex].String())
